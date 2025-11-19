@@ -1,0 +1,11 @@
+.navbar {
+  background-color: var(--navbar-bg);
+  color: var(--navbar-text);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
+
+.search-input {
+  background: var(--search-bg);
+  color: var(--search-text);
+  border: 1px solid var(--navbar-border);
+}

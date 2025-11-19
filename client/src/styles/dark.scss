@@ -1,0 +1,15 @@
+body.dark {
+  --navbar-bg: #1e1e1e;
+  --navbar-text: #f5f5f5;
+  --navbar-border: #333;
+  --search-bg: #2a2a2a;
+  --search-text: #f5f5f5;
+  --accent-color: #ffd369;
+  --body-bg: #121212;
+  --body-text: #f5f5f5;
+  --footer-bg: #1e1e1e;
+  --footer-text: #f5f5f5;
+
+  background-color: var(--body-bg);
+  color: var(--body-text);
+}
