@@ -1,91 +1,166 @@
 <template>
   <div class="chapter">
-    <div class="chapterInfo">
-      <h1>{{ seriesName }}</h1>
-      <h2>{{ chapterName }}</h2>
-      <h1>‧͙૮︵⭒‿᧔☪︎᧓‿⋆︵౨‧͙</h1>
+
+    <div v-if="errorMessage" class="error">{{ errorMessage }}</div>
+    <div v-if="loading" class="loading">Ładowanie rozdziału...</div>
+
+ 
+    <div v-if="!loading && !errorMessage" class="chapterInfo">
+      
+    
+      <h1 class="series-title" @click="goToSeries">
+        {{ seriesName }}
+      </h1>
+      
+  
+      <h2>{{ chapterTitle }}</h2>
+      
+      <div class="separator">‧͙૮︵⭒‿᧔☪︎᧓‿⋆︵౨‧͙</div>
+
+  
       <div class="chapterButtons">
-        <button class="prevChapter"><span>&#8678;</span></button>
-        <button class="nextChapter"><span>&#8680;</span></button>
+        <button 
+          @click="changeChapter(prevChapterNum)" 
+          :disabled="!prevChapterNum" 
+          :class="{ disabled: !prevChapterNum }">
+          <span>&#8678;</span> 
+        </button>
+
+        <button 
+          @click="changeChapter(nextChapterNum)" 
+          :disabled="!nextChapterNum"
+          :class="{ disabled: !nextChapterNum }">
+          <span>&#8680;</span>
+        </button>
       </div>
+
+   
       <div class="chapterContent">
           <p v-html="chapterContent"></p>
       </div>
-    </div>
 
-    <div class="chapterContent">
-        <h1>{{ chapterName }}</h1>
-        <p v-html="chapterContent"></p>
+    
+      <div class="chapterButtons">
+        <button 
+          @click="changeChapter(prevChapterNum)" 
+          :disabled="!prevChapterNum"
+          :class="{ disabled: !prevChapterNum }">
+          <span>&#8678;</span> 
+        </button>
+
+        <button 
+          @click="changeChapter(nextChapterNum)" 
+          :disabled="!nextChapterNum"
+          :class="{ disabled: !nextChapterNum }">
+          <span>&#8680;</span>
+        </button>
+      </div>
     </div>
-    </div>
+  </div>
 </template>
 
-<script>
-import { useRoute } from 'vue-router'
-import { ref, onMounted } from 'vue'
+<script setup>
+import { ref, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 
-export default {
-  setup() {
-    const route = useRoute()
+const route = useRoute();
+const router = useRouter();
 
-    const seriesName = ref("")
-    const chapterName = ref("")
-    const chapterContent = ref("")
-    const errorMessage = ref("")
 
-    onMounted(async () => {
-      const novelName = route.params.novelName;
-      const chapterNumber = route.params.chapterNumber;
+const seriesName = ref("");
+const chapterTitle = ref("");
+const chapterContent = ref("");
+const nextChapterNum = ref(null);
+const prevChapterNum = ref(null);
 
-      if (!novelName || !chapterNumber) {
-        errorMessage.value = "Brak nazwy noweli lub numeru rozdziału w adresie URL.";
-        return;
+const loading = ref(false);
+const errorMessage = ref("");
+
+const fetchChapterData = async (novelName, chapterNumber) => {
+  loading.value = true;
+  errorMessage.value = "";
+  
+  try {
+
+    const response = await fetch(`http://localhost:5193/api/chapter/novel/${novelName}/chapter/${chapterNumber}`);
+
+    if (!response.ok) {
+      throw new Error("Nie znaleziono rozdziału lub błąd serwera.");
+    }
+
+    const data = await response.json();
+
+ 
+    seriesName.value = data.novelTitle; 
+    chapterTitle.value = `Rozdział ${data.chapterNumber}: ${data.title}`;
+    chapterContent.value = data.content;
+    
+
+    nextChapterNum.value = data.nextChapterNumber;
+    prevChapterNum.value = data.prevChapterNumber;
+
+  } catch (err) {
+    console.error(err);
+    errorMessage.value = "Błąd podczas ładowania rozdziału.";
+  } finally {
+    loading.value = false;
+  }
+};
+
+// Funkcja nawigacji do innego rozdziału
+const changeChapter = (newChapterNum) => {
+  if (newChapterNum) {
+    router.push({
+      name: 'chapter',
+      params: {
+        novelName: route.params.novelName,
+        chapterNumber: newChapterNum
       }
+    });
 
-      try {
-        const res = await fetch(`http://localhost:5193/api/chapter/novel/${novelName}/chapter/${chapterNumber}`);
+    window.scrollTo(0, 0);
+  }
+};
 
-        if (!res.ok) {
-          throw new Error(`Błąd serwera: ${res.status}`);
-        }
 
-        const data = await res.json();
-        seriesName.value = data.novel.title; 
-        chapterName.value = data.title;
-        chapterContent.value = data.content;
-      } 
-      catch (err) {
-        console.error("Błąd pobierania:", err);
-        errorMessage.value = "Nie udało się pobrać rozdziału. Sprawdź, czy backend działa poprawnie.";
-      }
-    })
+const goToSeries = () => {
+  router.push({
+    name: 'novel',
+    params: { novelName: route.params.novelName }
+  });
+};
 
-    return {
-      seriesName,
-      chapterName,
-      chapterContent,
-      errorMessage
+
+onMounted(() => {
+  fetchChapterData(route.params.novelName, route.params.chapterNumber);
+});
+watch(
+  () => [route.params.novelName, route.params.chapterNumber],
+  ([newNovel, newChapter]) => {
+    if (newNovel && newChapter) {
+      fetchChapterData(newNovel, newChapter);
     }
   }
-}
-const chapterContent = ref("");
-
-try {
-  const response = await fetch("http://localhost:5193/api/chapter/1");
-  const data = await response.json();
-  chapterContent.value = data.content;
-} catch (error) {
-  console.error("Error fetching chapter content:", error);
-}
+);
 </script>
-
 
 <style lang="scss" scoped>
 .chapter {
   padding: 2rem;
   margin: 0 auto;
-  display: flex;
-  flex-direction: column;
+  max-width: 800px;
+}
+
+.error {
+  color: red;
+  text-align: center;
+  font-size: 1.5rem;
+}
+
+.loading {
+  text-align: center;
+  font-size: 1.2rem;
+  color: var(--body-text);
 }
 
 .chapterInfo {
@@ -93,46 +168,64 @@ try {
   color: var(--body-text);
   padding: 1.5rem;
   border-radius: 8px;
-  h1 {
-    text-align: center;
+}
+
+.series-title {
+  text-align: center;
+  cursor: pointer;
+  color: var(--link-color, #3498db);
+  &:hover {
+    text-decoration: underline;
   }
-  h2 {
-    margin-top: 1rem;
-    text-align: center;
-  }
+}
+
+h2 {
+  margin-top: 0.5rem;
+  text-align: center;
+  font-size: 1.5rem;
+}
+
+.separator {
+  text-align: center;
+  margin: 1rem 0;
+  font-size: 1.5rem;
+  color: #888;
 }
 
 .chapterButtons {
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
+  margin: 2rem 0;
+
   button {
-    margin: 1rem;
-    background-color: var(--button-bg);
-    color: var(--button-text);
+    background-color: var(--button-bg, #444);
+    color: var(--button-text, #fff);
     border: none;
     padding: 0.75rem 1.5rem;
     border-radius: 6px;
     cursor: pointer;
     font-size: 1rem;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-    transition: background-color 0.3s ease, color 0.3s ease;
-    span {
-      font-size: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: opacity 0.3s;
+
+    &:hover:not(.disabled) {
+      background-color: var(--button-hover-bg, #666);
     }
-    &:hover {
-      background-color: var(--button-hover-bg);
-      color: var(--button-hover-text);
+
+    &.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      background-color: #333;
     }
   }
 }
 
 .chapterContent {
   font-size: 1.2rem;
-  margin-top: 2rem;
   line-height: 1.8;
-  h2{
-    text-align: left;
-    font-size: 0.5rem;
-  }
+  text-align: justify;
+  white-space: pre-wrap;
 }
 </style>

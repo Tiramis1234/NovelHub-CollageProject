@@ -1,10 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using server.data;
-using server.models;
+using server.Dtos;
 
 namespace server.Controllers
 {
@@ -13,46 +10,44 @@ namespace server.Controllers
     public class ChapterController : ControllerBase
     {
         private readonly ApplicationDBContext _context;
+
         public ChapterController(ApplicationDBContext context)
         {
             _context = context;
         }
+
         [HttpGet("novel/{novelName}/chapter/{chapterNumber}")]
-        public IActionResult GetChapterByNovelAndNumber([FromRoute] string novelName, [FromRoute] int chapterNumber)
+        public async Task<IActionResult> GetChapter([FromRoute] string novelName, [FromRoute] int chapterNumber)
         {
-            string searchTitle = novelName.Replace("-", " ");
+            string decodedTitle = novelName.Replace("-", " ");
 
-            var chapter = _context.Chapters
-                .Include(c => c.Novel)
-                .AsEnumerable() 
-                .FirstOrDefault(c => 
-                   
-                    string.Equals(c.Novel.Title.Replace("-", " "), searchTitle, StringComparison.OrdinalIgnoreCase) 
-                    && c.ChapterNumber == chapterNumber);
+        
+            var novel = await _context.Novels.FirstOrDefaultAsync(n => n.Title == decodedTitle);
+            if (novel == null) return NotFound("Nie znaleziono noweli");
 
-            if (chapter == null)
+       
+            var currentChapter = await _context.Chapters
+                .FirstOrDefaultAsync(c => c.NovelId == novel.Id && c.ChapterNumber == chapterNumber);
+
+            if (currentChapter == null) return NotFound("Nie znaleziono rozdziału");
+
+      
+            bool hasNext = await _context.Chapters.AnyAsync(c => c.NovelId == novel.Id && c.ChapterNumber == chapterNumber + 1);
+            bool hasPrev = await _context.Chapters.AnyAsync(c => c.NovelId == novel.Id && c.ChapterNumber == chapterNumber - 1);
+
+     
+            var dto = new ChapterReadDto
             {
-                return NotFound(new { message = $"Nie znaleziono noweli o nazwie: {novelName} lub rozdziału {chapterNumber}" });
-            }
+                Id = currentChapter.Id,
+                ChapterNumber = currentChapter.ChapterNumber,
+                Title = currentChapter.Title, 
+                Content = currentChapter.Content,
+                NovelTitle = novel.Title, 
+                NextChapterNumber = hasNext ? chapterNumber + 1 : null,
+                PrevChapterNumber = hasPrev ? chapterNumber - 1 : null
+            };
 
-            return Ok(chapter);
-        }
-        [HttpGet]
-        public IActionResult GetAll()
-        {
-            var chapters = _context.Chapters.ToList();
-            return Ok(chapters);
-        }
-
-        [HttpGet("{id}")]
-        public IActionResult GetById([FromRoute] int id)
-        {
-            var chapter = _context.Chapters.Find(id);
-            if (chapter == null)
-            {
-                return NotFound();
-            }
-            return Ok(chapter);
+            return Ok(dto);
         }
     }
 }
