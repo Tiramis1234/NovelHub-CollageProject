@@ -1,141 +1,358 @@
 <template>
-  <div class="novel-container">
-    <div v-if="loading" class="loading">Ładowanie danych...</div>
-    <div v-if="errorMessage" class="error">{{ errorMessage }}</div>
+  <div class="novel-page">
+    
+    <div v-if="loading" class="status-container">
+      <div class="spinner"></div>
+      <p>Ładowanie noweli...</p>
+    </div>
 
-    <div v-if="!loading && novelData" class="novel-details">
+
+    <div v-else-if="errorMessage" class="status-container error">
+      <h2>Ojej! Coś poszło nie tak.</h2>
+      <p>{{ errorMessage }}</p>
+      <router-link to="/series" class="back-btn">Wróć do listy</router-link>
+    </div>
+
+
+    <div v-else-if="novel" class="content-wrapper">
+      
 
       <div class="novel-header">
-        <h1>{{ novelData.title }}</h1>
-        <p class="description">{{ novelData.description || 'Brak opisu.' }}</p>
+        <div class="cover-section">
+          <img 
+            :src="`/covers/${novel.id}.png`" 
+            alt="Okładka noweli" 
+            @error="handleImageError"
+            class="novel-cover"
+          />
+        </div>
+        <div class="info-section">
+          <h1 class="novel-title">{{ novel.title }}</h1>
+
+          <div class="actions">
+            <button 
+              @click="startReading" 
+              class="action-btn primary"
+              :disabled="!novel.chapters || novel.chapters.length === 0">
+              Read Now
+            </button>
+            <!--Boockmark-->
+          </div>
+
+          <div class="description-box">
+            <h3>Description</h3>
+            <p>{{ novel.description || 'Brak opisu dla tej noweli.' }}</p>
+          </div>
+        </div>
       </div>
 
       <hr class="divider" />
 
- 
-      <div class="chapter-list">
-        <h3>Dostępne rozdziały:</h3>
-        <ul>
-          <li v-for="chapter in novelData.chapters" :key="chapter.chapterNumber">
-            <button class="chapter-link" @click="goToChapter(chapter.chapterNumber)">
-              <span class="ch-num">Rozdział {{ chapter.chapterNumber }}</span>
-              <span class="ch-title">{{ chapter.title }}</span>
-            </button>
-          </li>
-        </ul>
-        <div v-if="novelData.chapters.length === 0">Brak rozdziałów.</div>
+      <div class="chapters-section">
+        <h3>Chapters ({{ novel.chapters.length }})</h3>
+        
+        <div v-if="novel.chapters.length > 0" class="chapters-grid">
+          <button 
+            v-for="chapter in novel.chapters" 
+            :key="chapter.chapterNumber"
+            class="chapter-card"
+            @click="goToChapter(chapter.chapterNumber)"
+          >
+            <span class="chap-num">Rozdział {{ chapter.chapterNumber }}</span>
+            <span class="chap-title">{{ chapter.title }}</span>
+          </button>
+        </div>
+
+        <div v-else class="no-chapters">
+          <p>Autora dopadło lenistwo – brak rozdziałów.</p>
+        </div>
       </div>
+
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+
+
+const API_URL = "http://localhost:5193";
 
 const route = useRoute();
 const router = useRouter();
 
-const novelData = ref(null);
-const loading = ref(false);
+const novel = ref(null);
+const loading = ref(true);
 const errorMessage = ref("");
 
-const fetchNovel = async () => {
-  const novelName = route.params.novelName;
+const fetchNovelData = async () => {
   loading.value = true;
+  errorMessage.value = "";
+  const slug = route.params.novelName;
 
   try {
 
-    const response = await fetch(`http://localhost:5193/api/novel/${novelName}`);
-    
-    if (!response.ok) throw new Error("Nie udało się pobrać noweli.");
+    const response = await fetch(`${API_URL}/api/novel/${slug}`);
+
+    if (!response.ok) {
+      if (response.status === 404) throw new Error("Nie znaleziono takiej noweli.");
+      throw new Error("Błąd połączenia z serwerem.");
+    }
 
     const data = await response.json();
-    novelData.value = data; 
+    novel.value = data;
   } catch (err) {
     console.error(err);
-    errorMessage.value = "Błąd podczas pobierania danych noweli.";
+    errorMessage.value = err.message;
   } finally {
     loading.value = false;
   }
 };
 
-const goToChapter = (chapterNum) => {
+
+const getCoverUrl = (id) => {
+  return `${API_URL}/covers/${id}.jpg`;
+};
+
+const handleImageError = (event) => {
+
+  if (!event.target.src.includes('default.jpg')) {
+    event.target.src = `${API_URL}/covers/default.jpg`;
+  }
+};
+
+
+const goToChapter = (num) => {
   router.push({
     name: 'chapter',
     params: {
       novelName: route.params.novelName,
-      chapterNumber: chapterNum
+      chapterNumber: num
     }
   });
 };
 
+const startReading = () => {
+  if (novel.value && novel.value.chapters.length > 0) {
+    const firstChapter = novel.value.chapters.reduce((prev, curr) => 
+      prev.chapterNumber < curr.chapterNumber ? prev : curr
+    );
+    goToChapter(firstChapter.chapterNumber);
+  }
+};
+
 onMounted(() => {
-  fetchNovel();
+  fetchNovelData();
+});
+
+watch(() => route.params.novelName, () => {
+  fetchNovelData();
 });
 </script>
 
 <style lang="scss" scoped>
-.novel-container {
-  max-width: 900px;
+.novel-page {
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 2rem 1rem;
+
+  margin-top: 80px; 
+  min-height: 80vh;
   color: var(--body-text);
 }
 
 .novel-header {
-  text-align: center;
-  margin-bottom: 2rem;
+  display: flex;
+  gap: 3rem;
+  margin-bottom: 3rem;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+  }
+}
+
+.cover-section {
+  flex-shrink: 0;
   
-  h1 {
+  .novel-cover {
+    width: 280px;
+    height: 400px;
+    object-fit: cover;
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+    transition: transform 0.3s;
+
+    &:hover {
+      transform: scale(1.02);
+    }
+  }
+
+  @media (max-width: 768px) {
+    .novel-cover {
+      width: 200px;
+      height: 300px;
+    }
+  }
+}
+
+.info-section {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+
+  .novel-title {
     font-size: 2.5rem;
-    margin-bottom: 1rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    line-height: 1.2;
+    color: var(--primary-text);
+  }
+
+  .novel-author {
+    font-size: 1.1rem;
+    color: #888;
+    margin-bottom: 1.5rem;
+    font-style: italic;
+  }
+
+  .actions {
+    margin: 1.5rem 0;
+    
+    .action-btn {
+      padding: 0.8rem 2rem;
+      font-size: 1.1rem;
+      border-radius: 30px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      transition: transform 0.2s, box-shadow 0.2s;
+
+      &.primary {
+        background-color: var(--accent-color, #3498db);
+        color: white;
+        box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+
+        &:hover {
+          background-color: var(--button-hover-bg, #2980b9);
+          transform: translateY(-2px);
+        }
+
+        &:disabled {
+          background-color: #555;
+          cursor: not-allowed;
+          box-shadow: none;
+        }
+      }
+    }
+  }
+
+  .description-box {
+    margin-top: auto;
+    
+    h3 {
+      font-size: 1.3rem;
+      margin-bottom: 0.5rem;
+      border-bottom: 2px solid var(--accent-color, #3498db);
+      display: inline-block;
+    }
+
+    p {
+      line-height: 1.6;
+      font-size: 1rem;
+      opacity: 0.9;
+      white-space: pre-wrap;
+    }
   }
 }
 
 .divider {
   border: 0;
   height: 1px;
-  background: #444;
+  background: linear-gradient(to right, transparent, rgba(128,128,128,0.3), transparent);
   margin: 2rem 0;
 }
 
-.chapter-list {
-  ul {
-    list-style: none;
-    padding: 0;
-  }
-
-  li {
-    margin-bottom: 0.5rem;
-  }
-
-  .chapter-link {
-    width: 100%;
-    display: flex;
-    justify-content: flex-start;
-    gap: 1rem;
-    padding: 1rem;
-    background-color: var(--body-bg); /* Dostosuj do swojego theme */
-    border: 1px solid #444;
-    color: inherit;
-    cursor: pointer;
-    text-align: left;
-    border-radius: 4px;
-    transition: background 0.2s;
-
-    &:hover {
-      background-color: var(--button-hover-bg, #333);
-    }
-
-    .ch-num {
-      font-weight: bold;
-      color: var(--accent-color, #3498db);
-      min-width: 100px;
-    }
+.chapters-section {
+  h3 {
+    margin-bottom: 1.5rem;
+    font-size: 1.5rem;
   }
 }
 
-.error { color: red; text-align: center; }
-.loading { text-align: center; }
+.chapters-grid {
+  display: grid;
+
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.chapter-card {
+  background-color: var(--card-bg, rgba(255,255,255,0.05));
+  border: 1px solid rgba(128,128,128,0.2);
+  padding: 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.2s ease;
+  color: inherit;
+
+  &:hover {
+    background-color: var(--card-hover-bg, rgba(255,255,255,0.1));
+    border-color: var(--accent-color, #3498db);
+    transform: translateX(5px);
+  }
+
+  .chap-num {
+    font-weight: bold;
+    color: var(--accent-color, #3498db);
+    white-space: nowrap;
+  }
+
+  .chap-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.status-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 50vh;
+  text-align: center;
+
+  &.error {
+    color: #e74c3c;
+  }
+}
+
+.spinner {
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border-left-color: var(--accent-color, #3498db);
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.back-btn {
+  margin-top: 1rem;
+  color: var(--accent-color);
+  text-decoration: underline;
+  cursor: pointer;
+}
 </style>

@@ -1,11 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using server.data;
-using server.models;
-
+using server.Dtos;
 
 namespace server.Controllers
 {
@@ -14,27 +10,61 @@ namespace server.Controllers
     public class NovelController : ControllerBase
     {
         private readonly ApplicationDBContext _context;
+
         public NovelController(ApplicationDBContext context)
         {
             _context = context;
         }
 
-        [HttpGet]
-        public IActionResult GetAll()
+
+        [HttpGet("{id:int}")] 
+        public async Task<IActionResult> GetById([FromRoute] int id)
         {
-            var novels = _context.Novels.ToList();
-            return Ok(novels);
+ 
+            var novel = await _context.Novels.FindAsync(id);
+            if (novel == null) return NotFound();
+            return Ok(novel);
         }
 
-        [HttpGet("{id}")]
-        public IActionResult GetById([FromRoute] int id)
+    
+        [HttpGet("{novelName}")]
+        public async Task<IActionResult> GetByTitle([FromRoute] string novelName)
         {
-            var novel = _context.Novels.Find(id);
+   
+            string decodedTitle = novelName.Replace("-", " ");
+
+
+            var novel = await _context.Novels
+                .Include(n => n.Chapters)
+                .FirstOrDefaultAsync(n => n.Title == decodedTitle);
+
             if (novel == null)
             {
-                return NotFound();
+                return NotFound(new { message = "Nie znaleziono noweli o takim tytule." });
             }
-            return Ok(novel);
+
+            var dto = new NovelDetailsDto
+            {
+                Id = novel.Id,
+                Title = novel.Title,
+                Description = novel.Description, 
+                Chapters = novel.Chapters
+                    .OrderBy(c => c.ChapterNumber)
+                    .Select(c => new ChapterListItemDto
+                    {
+                        ChapterNumber = c.ChapterNumber,
+                        Title = c.Title
+                    }).ToList()
+            };
+
+            return Ok(dto);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+             var novels = await _context.Novels.ToListAsync();
+             return Ok(novels);
         }
     }
 }
