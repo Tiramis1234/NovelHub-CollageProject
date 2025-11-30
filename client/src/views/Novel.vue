@@ -69,10 +69,12 @@
       </div>
 
     </div>
+    <commentSection />
   </div>
 </template>
 
 <script setup>
+import CommentSection from '../elements/CommentSection.vue';
 import { ref, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
