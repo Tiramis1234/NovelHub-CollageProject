@@ -2,7 +2,7 @@
   <div class="chapter">
 
     <div v-if="errorMessage" class="error">{{ errorMessage }}</div>
-    <div v-if="loading" class="loading">Ładowanie rozdziału...</div>
+    <div v-if="loading" class="loading"></div>
 
  
     <div v-if="!loading && !errorMessage" class="chapterInfo">

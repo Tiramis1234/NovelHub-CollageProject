@@ -8,10 +8,13 @@
             <div v-else>
                 <img src="../assets/gitLight.png" alt="">
             </div>
+            <a href="https://po.edu.pl/" target="_blank">
+                <img src="https://wi.po.edu.pl/wp-content/uploads/sites/33/2025/07/cropped-cropped-Logo-WI-uprs-blk-m.png" alt="Logo" />
+            </a>
         </div>
     </div>
 
-    <div class="copyright"></div>
+    
 </template>
 
 <script setup>
@@ -28,6 +31,10 @@ const { theme } = useTheme();
         color: var(--footer-text);
         border-top: 1px solid var(--navbar-border);
         transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+        position: static;
+        
+        z-index: 1000;
+        
 }
 
 .copyright {

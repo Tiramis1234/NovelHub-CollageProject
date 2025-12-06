@@ -8,7 +8,7 @@ const { theme } = useTheme();
 </script>
 
 <template>
-  <div>
+  <div class="app-container">
     <Navbar />
     <div class="nav-spacer" aria-hidden="true"></div>
     <main class="main-content">
@@ -28,8 +28,16 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+
 .app-container {
-  min-height: 100vh;
+  min-height: 110vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content {
+  flex: 1 1 auto;
+  overflow: auto;
 }
 
 body {
@@ -38,9 +46,15 @@ body {
 }
 
 .nav-spacer {
-  height: 60px; 
+  height: 70px; 
   background: var(--navbar-bg);
   border-bottom: 1px solid var(--navbar-border);
   transition: background-color 0.25s ease, border-color 0.25s ease;
+}
+
+@media (max-width: 768px) {
+  .nav-spacer {
+    height: 60px;
+  }
 }
 </style>

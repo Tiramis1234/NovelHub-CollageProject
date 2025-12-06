@@ -1,13 +1,11 @@
 <template>
-  <nav class="navbar">
+  <nav class="navbar" :class="{ 'navbar-hidden': isNavbarHidden }">
     <div class="navbar-container">
       
-
       <RouterLink to="/" class="logo">
         <img src="../assets/logo.png" alt="Logo" class="logo-img" />
         <h1 class="logo-text">WebNovel Hub</h1>
       </RouterLink>
-
 
       <div class="mobile-controls">
         <button class="theme-toggle mobile-only" @click="toggleTheme" aria-label="Toggle theme">
@@ -20,24 +18,28 @@
         </button>
       </div>
 
- 
       <div class="nav-menu" :class="{ 'active': isMenuOpen }">
-        
-     
         <div class="nav-links">
+          <RouterLink to="/" class="nav-link" @click="closeMenu">Home</RouterLink>
           <RouterLink to="/series" class="nav-link" @click="closeMenu">Series</RouterLink>
-       
-        </div>
-
- 
-        <div class="search-container">
-          <input
-            type="text"
-            v-model="searchQuery"
-            placeholder="Szukaj..."
-            class="search-input"
-            @keyup.enter="handleSearch" 
-          />
+          
+          <RouterLink 
+            v-if="isLoggedIn" 
+            to="/profile" 
+            class="nav-link" 
+            @click="closeMenu"
+          >
+            Profile
+          </RouterLink>
+          
+          <RouterLink 
+            v-else 
+            to="/login" 
+            class="nav-link" 
+            @click="closeMenu"
+          >
+            Login
+          </RouterLink>
         </div>
 
         <button class="theme-toggle desktop-only" @click="toggleTheme" aria-label="Toggle theme">
@@ -51,13 +53,43 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useTheme } from '../composables/useTheme';
 
-
 const isMenuOpen = ref(false);
-const searchQuery = ref('');
 const { theme, toggleTheme } = useTheme();
+const isLoggedIn = ref(false); 
+
+
+const isNavbarHidden = ref(false);
+const lastScrollPosition = ref(0);
+
+const handleScroll = () => {
+
+  const currentScrollPosition = window.scrollY || document.documentElement.scrollTop;
+
+
+  if (isMenuOpen.value) {
+    return;
+  }
+
+
+  if (currentScrollPosition < 0) {
+    return;
+  }
+
+  // Jeśli jesteśmy na samej górze, zawsze pokazuj
+  if (currentScrollPosition === 0) {
+    isNavbarHidden.value = false;
+    lastScrollPosition.value = 0;
+    return;
+  }
+
+  if (Math.abs(currentScrollPosition - lastScrollPosition.value) > 60) {
+    isNavbarHidden.value = currentScrollPosition > lastScrollPosition.value;
+    lastScrollPosition.value = currentScrollPosition;
+  }
+};
 
 const toggleMenu = () => {
   isMenuOpen.value = !isMenuOpen.value;
@@ -67,23 +99,38 @@ const closeMenu = () => {
   isMenuOpen.value = false;
 };
 
-const handleSearch = () => {
-  console.log("Szukam:", searchQuery.value);
-  closeMenu(); 
-};
+
+onMounted(() => {
+  window.addEventListener('scroll', handleScroll);
+});
+
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleScroll);
+});
 </script>
 
 <style lang="scss" scoped>
 
 .navbar {
-  position: fixed;
-  top: 0; left: 0; right: 0;
-  height: 70px; 
+  position: fixed; 
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 70px;
   background-color: var(--body-bg);
   color: var(--body-text);
   border-bottom: 1px solid rgba(128, 128, 128, 0.2);
   z-index: 1000;
-  transition: background-color 0.3s, color 0.3s;
+  
+
+  transition: transform 0.3s ease-in-out, background-color 0.3s, color 0.3s;
+}
+
+
+.navbar-hidden {
+  transform: translateY(-100%); 
 }
 
 .navbar-container {
@@ -112,22 +159,17 @@ const handleSearch = () => {
   display: none;
 }
 
-
 .nav-menu {
   display: flex;
   align-items: center;
-  flex: 1;
-  justify-content: flex-end;
-
-  gap: 40px; 
 }
 
 .nav-links {
   display: flex;
-
+  align-items: center;
   gap: 30px; 
+  margin-right: 30px;
 }
-
 
 .nav-link {
   text-decoration: none;
@@ -137,7 +179,6 @@ const handleSearch = () => {
   position: relative; 
   transition: color 0.3s ease, transform 0.2s ease;
   padding: 5px 0;
-
 
   &::after {
     content: '';
@@ -155,40 +196,17 @@ const handleSearch = () => {
     transform: translateY(-2px);
   }
 
-
   &:hover::after {
     width: 100%;
     left: 0;
   }
   
-
   &.router-link-active {
     color: var(--accent-color, #3498db);
     &::after {
       width: 100%;
       left: 0;
     }
-  }
-}
-
-.search-container {
-  max-width: 300px;
-  width: 100%;
-}
-
-.search-input {
-  width: 100%;
-  padding: 0.6rem 1.2rem;
-  border-radius: 25px;
-  border: 1px solid rgba(128, 128, 128, 0.4);
-  background-color: var(--input-bg, #fff);
-  color: var(--input-text, #000);
-  outline: none;
-  transition: border-color 0.3s, box-shadow 0.3s;
-  
-  &:focus {
-    border-color: var(--accent-color, #3498db);
-    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
   }
 }
 
@@ -205,6 +223,7 @@ const handleSearch = () => {
     transform: rotate(15deg) scale(1.1);
   }
 }
+
 
 @media (max-width: 768px) {
   .navbar {
@@ -266,6 +285,7 @@ const handleSearch = () => {
     width: 100%;
     gap: 10px; 
     margin-bottom: 10px;
+    margin-right: 0;
   }
 
   .nav-link {
@@ -274,18 +294,12 @@ const handleSearch = () => {
     padding: 10px 0;
     border-bottom: 1px solid rgba(128,128,128, 0.1);
     
-
     &:hover {
       transform: none; 
     }
     &::after {
       display: none; 
     }
-  }
-
-  .search-container {
-    max-width: 100%;
-    margin-bottom: 10px;
   }
 }
 </style>
