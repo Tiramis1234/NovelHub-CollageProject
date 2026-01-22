@@ -1,17 +1,16 @@
 <template>
   <div class="series-container">
-    <h1>Novel List</h1>
+    <h1>Biblioteka Noweli</h1>
     
-
     <div v-if="loading" class="loading">Ładowanie biblioteki...</div>
     <div v-if="errorMessage" class="error">{{ errorMessage }}</div>
 
+    <div v-if="!loading && filteredNovels.length === 0 && novels.length > 0" class="no-results">
+      Nie znaleziono noweli pasujących do zapytania "{{ searchQuery }}".
+    </div>
 
-    <div v-if="!loading && novels.length > 0" class="series-grid">
-      
-      <div v-for="novel in novels" :key="novel.id" class="novel-card">
-        
-
+    <div v-if="!loading && paginatedNovels.length > 0" class="series-grid">
+      <div v-for="novel in paginatedNovels" :key="novel.id" class="novel-card">
         <div class="novel-cover-wrapper">
            <img 
              :src="`/covers/${novel.id}.png`" 
@@ -23,36 +22,77 @@
 
         <div class="card-content">
           <h2>{{ novel.title }}</h2>
-          
-          
           <p class="description">{{ truncateText(novel.description, 100) }}</p>
         </div>
         
         <div class="card-actions">
-
           <router-link 
             :to="{ name: 'novel', params: { novelName: getNovelSlug(novel.title) } }" 
             class="read-btn"
           >
-            Read
+            Czytaj
           </router-link>
         </div>
       </div>
+    </div>
 
+    <div v-if="!loading && totalPages > 1" class="pagination-controls">
+      <button 
+        @click="goToPage(1)" 
+        :disabled="currentPage === 1" 
+        class="page-btn"
+      >
+        First
+      </button>
+      <button 
+        @click="prevPage" 
+        :disabled="currentPage === 1" 
+        class="page-btn"
+      >
+        Prev
+      </button>
+
+      <span class="page-info">Strona {{ currentPage }} z {{ totalPages }}</span>
+
+      <button 
+        @click="nextPage" 
+        :disabled="currentPage === totalPages" 
+        class="page-btn"
+      >
+        Next
+      </button>
+      <button 
+        @click="goToPage(totalPages)" 
+        :disabled="currentPage === totalPages" 
+        class="page-btn"
+      >
+        Last
+      </button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
+import { useRoute } from 'vue-router';
 
 const novels = ref([]);
 const loading = ref(false);
 const errorMessage = ref("");
+const route = useRoute();
 
+// Stan wyszukiwania i paginacji
+const searchQuery = ref(route.query.q || '');
+const currentPage = ref(1);
+const itemsPerPage = 20;
+
+// Watch na zmiany w URL (obsługa wyszukiwarki z Navbara)
+watch(() => route.query.q, (newVal) => {
+  searchQuery.value = newVal || '';
+  currentPage.value = 1; // Reset do pierwszej strony po wyszukaniu
+});
 
 const handleImageError = (event) => {
-
   if (!event.target.src.includes('default.png')) {
     event.target.src = "/covers/default.png";
   }
@@ -69,16 +109,33 @@ const truncateText = (text, length) => {
   return text.substring(0, length) + "...";
 };
 
+// Logika filtrowania
+const filteredNovels = computed(() => {
+  if (!searchQuery.value) return novels.value;
+  const lowerQuery = searchQuery.value.toLowerCase();
+  return novels.value.filter(n => n.title.toLowerCase().includes(lowerQuery));
+});
+
+// Logika paginacji
+const totalPages = computed(() => Math.ceil(filteredNovels.value.length / itemsPerPage));
+
+const paginatedNovels = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage;
+  const end = start + itemsPerPage;
+  return filteredNovels.value.slice(start, end);
+});
+
+// Sterowanie stronami
+const goToPage = (page) => currentPage.value = page;
+const nextPage = () => { if (currentPage.value < totalPages.value) currentPage.value++; };
+const prevPage = () => { if (currentPage.value > 1) currentPage.value--; };
+
 const fetchNovels = async () => {
   loading.value = true;
   try {
-  
     const response = await fetch('http://localhost:5193/api/novel');
+    if (!response.ok) throw new Error("Nie udało się pobrać listy nowel.");
     
-    if (!response.ok) {
-      throw new Error("Nie udało się pobrać listy nowel.");
-    }
-
     const data = await response.json();
     novels.value = data;
   } catch (err) {
@@ -109,9 +166,15 @@ onMounted(() => {
   }
 }
 
+.no-results {
+  text-align: center;
+  font-size: 1.2rem;
+  margin-top: 2rem;
+  color: #888;
+}
+
 .series-grid {
   display: grid;
-
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 2rem;
 }
@@ -131,13 +194,11 @@ onMounted(() => {
     box-shadow: 0 12px 20px rgba(0,0,0,0.2);
     border-color: var(--accent-color, #3498db);
 
-
     .novel-cover-wrapper img {
       transform: scale(1.08);
     }
   }
 }
-
 
 .novel-cover-wrapper {
   width: 100%;
@@ -166,14 +227,6 @@ onMounted(() => {
     color: var(--primary-text);
     line-height: 1.3;
   }
-
-  .author {
-    font-size: 0.9rem;
-    color: #888;
-    margin-bottom: 0.8rem;
-    font-style: italic;
-  }
-
   .description {
     font-size: 0.95rem;
     color: var(--body-text);
@@ -205,17 +258,50 @@ onMounted(() => {
   }
 }
 
+/* Paginacja Style */
+.pagination-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-top: 3rem;
+  flex-wrap: wrap;
+
+  .page-btn {
+    background-color: var(--card-bg, #fff);
+    border: 1px solid rgba(128,128,128,0.3);
+    color: var(--body-text);
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+
+    &:hover:not(:disabled) {
+      border-color: var(--accent-color, #3498db);
+      color: var(--accent-color, #3498db);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  .page-info {
+    font-weight: bold;
+    margin: 0 10px;
+  }
+}
+
 .loading, .error {
   text-align: center;
   font-size: 1.2rem;
   margin-top: 3rem;
 }
-.error {
-  color: #e74c3c;
-}
+.error { color: #e74c3c; }
+
 @media (max-width: 600px) {
-  .novel-cover-wrapper {
-    height: 300px; 
-  }
+  .novel-cover-wrapper { height: 300px; }
 }
 </style>
